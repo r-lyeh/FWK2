@@ -1,0 +1,59 @@
+#if CODE
+#include "3rd_imCmdPalette.hh"
+
+const char *key_command_palette = "held(CTRL) & held(SHIFT) & down(P)";
+
+static
+void imcmd_init() {
+    do_once {
+        static auto* ctx = ImCmd::CreateContext();
+        ImCmd::SetStyleFont(ImCmdTextType_Regular, (ImFont*)(ui_fonthandles(NULL)[1]));
+        ImCmd::SetStyleFont(ImCmdTextType_Highlight, (ImFont*)(ui_fonthandles(NULL)[1]));
+        ImCmd::SetStyleColor(ImCmdTextType_Highlight, ImGui::ColorConvertFloat4ToU32(ImVec4(1,1,1,1)));
+    }
+}
+
+static
+void imcmd_draw() {
+    imcmd_init();
+
+    static bool show_command_palette = 0;
+
+    if (binding(key_command_palette)) {
+        show_command_palette = !show_command_palette;
+    }
+
+    static bool show_demo_window;
+    do_once {
+        ImCmd::Command toggle_demo_cmd;
+        toggle_demo_cmd.Name = "Toggle ImGui demo window";
+        toggle_demo_cmd.InitialCallback = [&]() {
+            show_demo_window = !show_demo_window;
+        };
+        ImCmd::AddCommand(std::move(toggle_demo_cmd));
+    }
+
+    if (show_demo_window) {
+        ImGui::ShowDemoWindow(&show_demo_window);
+    }
+
+    if (show_command_palette) {
+        ImCmd::SetNextWindowAffixedTop(ImGuiCond_Appearing);
+        ImCmd::CommandPaletteWindow("Command Palette", &show_command_palette);
+    }
+}
+
+void igAddCommandPalette(const char *text, void (*func)()) {
+    imcmd_init();
+
+    ImCmd::Command cmd;
+    cmd.Name = text;
+    cmd.InitialCallback = func;
+    ImCmd::AddCommand(cmd);
+}
+
+AUTORUN {
+    hooks("draw", imcmd_draw);
+}
+
+#endif
