@@ -1,0 +1,98 @@
+name: Build and Analyze
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore: [ '**.md', 'examples/**', "tests/**" ]
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore: [ '**.md', 'examples/**', "tests/**" ]
+
+jobs:
+  build-android:
+    strategy:
+      matrix:
+        abi: [ armeabi-v7a, armeabi-v7a with NEON, arm64-v8a, x86, x86_64 ]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Android NDK
+      id: setup-ndk
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: r25c
+        add-to-path: false
+
+    - name: Configure CMake
+      env:
+        ANDROID_NDK_HOME: ${{steps.setup-ndk.outputs.ndk-path}}
+      run: >
+        cmake 
+        -D CMAKE_TOOLCHAIN_FILE=${{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake
+        -D CMAKE_C_FLAGS=-Werror
+        -D CMAKE_VERBOSE_MAKEFILE=ON
+        -D ANDROID_ABI="${{ matrix.abi }}"
+        -D GLFM_USE_CLANG_TIDY=ON
+        -B "build/android_${{ matrix.abi }}"
+
+    - name: Build and Analyze
+      run: cmake --build "build/android_${{ matrix.abi }}"
+
+  build-apple:
+    name: build-${{ matrix.sdk }} (${{ matrix.objc_arc.name }})
+    strategy:
+      matrix:
+        sdk: [ appletvos, appletvsimulator, iphoneos, iphonesimulator, macosx ]
+        objc_arc: [ { name: objc_arc, value: YES }, { name: no_objc_arc, value: NO } ]
+    runs-on: macos-latest
+    env:
+      CFLAGS: -Werror
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: >
+        cmake
+        -D CMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO
+        -D CMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC=${{ matrix.objc_arc.value }}
+        -B build/${{ matrix.sdk }}_${{ matrix.objc_arc.name }}
+        -G Xcode
+
+    - name: Build
+      run: |
+        set -o pipefail
+        cmake --build build/${{ matrix.sdk }}_${{ matrix.objc_arc.name }} -- -sdk ${{ matrix.sdk }} \
+          | xcpretty -r json-compilation-database --output build/${{ matrix.sdk }}_${{ matrix.objc_arc.name }}/compile_commands.json
+
+    - name: Analyze
+      if: ${{ !endsWith(matrix.sdk, 'simulator') }}
+      run: |
+        sed -i.bak 's/ -ivfsstatcache [^ ]* / /g' build/${{ matrix.sdk }}_${{ matrix.objc_arc.name }}/compile_commands.json
+        $(brew --prefix llvm@15)/bin/clang-tidy --config-file=tests/clang-tidy-analyze.yml -p build/${{ matrix.sdk }}_${{ matrix.objc_arc.name }} src/glfm_apple.m
+
+  build-emscripten:
+    runs-on: ubuntu-latest
+    env:
+      CFLAGS: -Werror
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Emscripten SDK
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.35
+        actions-cache-folder: 'emsdk-cache'
+
+    - name: Install clang-tidy
+      run: sudo apt install -y clang-tidy
+
+    - name: Configure CMake
+      run: >
+        emcmake cmake 
+        -D CMAKE_VERBOSE_MAKEFILE=ON 
+        -D GLFM_USE_CLANG_TIDY=ON
+        -B build/emscripten
+
+    - name: Build and Analyze
+      run: cmake --build build/emscripten

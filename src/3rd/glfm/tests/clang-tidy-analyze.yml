@@ -1,0 +1,6 @@
+InheritParentConfig: true
+Checks: >
+  clang-analyzer-*,
+  -clang-analyzer-optin.performance.Padding
+HeaderFilterRegex: '.*'
+WarningsAsErrors: '*'

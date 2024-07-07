@@ -1,0 +1,61 @@
+#if is(win32)
+#include <winsock2.h>
+#include <windows.h>
+#endif
+
+#define LUA_IMPL
+#define LUA_USE_POPEN 1 // for lite editor
+#include "3rd_lua.h" // engine_extend
+#undef freelist
+#undef G
+
+#ifdef I
+#undef I // complex.h
+#endif
+#if !is(ems)
+#define LUAFFI_C
+#include "3rd_luaffi.h"
+#endif
+
+#include "3rd_luadebugger.h"
+
+#define COMPRESS_C
+#include "3rd_compress.h" // engine_pack
+
+#define DIR_C
+#include "3rd_archive_dir.h" // file_list
+
+#define ZIP_C
+#include "3rd_archive_zip.h" // file_crc32
+
+#define HTTPS_IMPLEMENTATION
+#include "3rd_https.h" // file_md5, file_sha1
+
+#define JSON5_C
+#include "3rd_json5.h" // engine_obj
+
+#define THREAD_IMPLEMENTATION
+#if is(win32)
+#include <mmsystem.h> // timeapi.h
+#endif
+#include "3rd_thread.h" // engine_obj
+
+#define TFD_IMPLEMENTATION
+#include "3rd_tfd.h" // engine_system
+
+#define SIMPLEX_C
+#include "3rd_simplex.h" // engine_math
+
+#if 0
+#define EVAL_EXTEND_CONSTANTS \
+   for( int vk = input_enum(id), *once = &vk; once; once = 0) \
+      if( vk >= 0 ) push(ev, vk);
+#define EVAL_EXTEND_FUNCTIONS \
+   /**/ if(!strcmp(id, "input") && nargs ==1) push(ev, input(pop(ev))); \
+   else if(!strcmp(id, "down")  && nargs ==1) push(ev, input_down(pop(ev))); \
+   else if(!strcmp(id, "held")  && nargs ==1) push(ev, input_held(pop(ev))); \
+   else if(!strcmp(id, "up")    && nargs ==1) push(ev, input_up(pop(ev))); \
+   else if(!strcmp(id, "idle")  && nargs ==1) push(ev, input_idle(pop(ev)));
+#endif
+#define expr expr2 // 3rd_lua.h
+#include "3rd_eval.h" // atof1
